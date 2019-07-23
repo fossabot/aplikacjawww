@@ -165,28 +165,25 @@ def my_profile_view(request):
     return render(request, 'profile.html', context)
 
 
+@login_required()
 def workshop_view(request, name=None):
     context = get_context(request)
+
     new = (name is None)
     if new:
         workshop = None
         title = 'Nowe warsztaty'
-        if not request.user.is_authenticated:
-            return redirect('login')
-        else:
-            has_perm_to_edit = True
+        has_perm_to_edit = True
     else:
         workshop = Workshop.objects.get(name=name)
         title = workshop.title
-        if request.user.is_authenticated:
-            has_perm_to_edit = Workshop.objects.filter(name=name, lecturer__user=request.user).exists()
-        else:
-            has_perm_to_edit = False
+        has_perm_to_edit = can_edit_workshop(workshop, request.user)
 
-    # Workshop proposals are only visible to admins
-    has_perm_to_see_all = request.user.has_perm('wwwapp.see_all_workshops')
-    if not has_perm_to_edit and not has_perm_to_see_all:
-        return redirect('login')
+    if not (
+        request.user.has_perm('wwwapp.see_all_workshops')
+        or has_perm_to_edit
+    ):
+        return HttpResponseForbidden()
 
     if has_perm_to_edit:
         if request.method == 'POST':
@@ -256,7 +253,8 @@ def workshop_page_view(request, name):
 
 def can_edit_workshop(workshop, user):
     if user.is_authenticated:
-        return Workshop.objects.filter(id=workshop.id, lecturer__user=user).exists()
+        return Workshop.objects.filter(id=workshop.id, lecturer__user=user).exists() \
+               or request.user.has_perm('wwwapp.edit_all_workshops')
     else:
         return False
 
@@ -266,9 +264,8 @@ def workshop_participants_view(request, name):
     workshop = get_object_or_404(Workshop, name=name)
 
     can_edit = can_edit_workshop(workshop, request.user)
-    can_see = can_edit or request.user.has_perm('wwwapp.see_all_workshops')
 
-    if not can_see:
+    if not (can_edit or request.user.has_perm('wwwapp.see_all_workshops')):
         return HttpResponseForbidden()
 
     context = get_context(request)
