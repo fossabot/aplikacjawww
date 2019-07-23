@@ -254,7 +254,7 @@ def workshop_page_view(request, name):
 def can_edit_workshop(workshop, user):
     if user.is_authenticated:
         return Workshop.objects.filter(id=workshop.id, lecturer__user=user).exists() \
-               or request.user.has_perm('wwwapp.edit_all_workshops')
+               or user.has_perm('wwwapp.edit_all_workshops')
     else:
         return False
 
